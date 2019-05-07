@@ -8,6 +8,7 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 #include "Shader.hpp"
+#include "Camera.hpp"
 #include <stdio.h>
 #include <math.h>
 #include <iostream>
@@ -40,6 +41,24 @@ static void glfw_error_callback(int error, const char* description)
 	fprintf(stderr, "Glfw Error %d: %s\n", error, description);
 }
 
+void processInput(GLFWwindow *window);
+void mouseCallback(GLFWwindow* window, double xpos, double ypos);
+void scrollCallback(GLFWwindow* window, double xoffset, double yoffset);
+
+const int SCREEN_WIDTH = 1024;
+const int SCREEN_HEIGHT = 1024;
+
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+float lastX = SCREEN_WIDTH / 2.0f;
+float lastY = SCREEN_WIDTH / 2.0f;
+bool firstMouse = true;
+
+// timing
+float deltaTime = 0.0f;	// time between current frame and last frame
+float lastFrame = 0.0f;
+
+glm::vec3 lightPos(1.2f, 1.0f, 2.0f);
+
 int main(int, char**)
 {
 	// Setup window
@@ -48,10 +67,7 @@ int main(int, char**)
 		return 1;
 
 	const char* glsl_version = "#version 130";
-	const char *TITLE = "Homework4";
-	const int SCREEN_WIDTH = 1024;
-	const int SCREEN_HEIGHT = 1024;
-	
+	const char *TITLE = "Homework6";
 
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
@@ -60,6 +76,8 @@ int main(int, char**)
 		return 1;
 	glfwMakeContextCurrent(window);
 	glfwSwapInterval(1); // Enable vsync
+	glfwSetCursorPosCallback(window, mouseCallback);
+	glfwSetScrollCallback(window, scrollCallback);
 
 	// Initialize OpenGL loader
 #if defined(IMGUI_IMPL_OPENGL_LOADER_GL3W)
@@ -88,79 +106,126 @@ int main(int, char**)
 
 	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
-	Shader myShader("Shader.v", "Shader.f");
+	Shader phongLighting("PhongShader.v", "PhongShader.f");
+	Shader gouraudLighting("GouraudShader.v", "GouraudShader.f");
+	Shader lampShader("LampShader.v", "LampShader.f");
 
-	unsigned int VAO;
-	glGenVertexArrays(1, &VAO);
-
-	unsigned int VBO;
-	glGenBuffers(1, &VBO);
-
-	glBindVertexArray(VAO);
 	float vertices[] = {
-		-0.2f, -0.2f, -0.2f, 1.0f, 1.0f, 1.0f,
-		0.2f, -0.2f, -0.2f,0.0f, 1.0f, 1.0f,
-		0.2f, 0.2f, -0.2f,0.0f, 0.0f, 1.0f,
-		0.2f, 0.2f, -0.2f,0.0f, 0.0f, 1.0f,
-		-0.2f, 0.2f, -0.2f,1.0f, 0.0f, 1.0f,
-		-0.2f, -0.2f, -0.2f,1.0f, 1.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f,  0.0f, -1.0f,
 
-		-0.2f, -0.2f, 0.2f,1.0f, 1.0f, 0.0f,
-		0.2f, -0.2f, 0.2f,0.0f, 1.0f, 0.0f,
-		0.2f, 0.2f, 0.2f,0.0f, 0.0f, 0.0f,
-		0.2f, 0.2f, 0.2f,0.0f, 0.0f, 0.0f,
-		-0.2f, 0.2f, 0.2f,1.0f, 0.0f, 0.0f,
-		-0.2f, -0.2f, 0.2f,1.0f, 1.0f, 0.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f,  0.0f,  1.0f,
 
-		-0.2f, 0.2f, 0.2f,1.0f, 0.0f, 0.0f,
-		-0.2f, 0.2f, -0.2f,1.0f, 0.0f, 1.0f,
-		-0.2f, -0.2f, -0.2f,1.0f, 1.0f, 1.0f,
-		-0.2f, -0.2f, -0.2f,1.0f, 1.0f, 1.0f,
-		-0.2f, -0.2f, 0.2f,1.0f, 1.0f, 0.0f,
-		-0.2f, 0.2f, 0.2f,1.0f, 0.0f, 0.0f,
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f,  0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f, -0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
+		-0.5f,  0.5f,  0.5f, -1.0f,  0.0f,  0.0f,
 
-		0.2f, 0.2f, 0.2f,0.0f, 0.0f, 0.0f,
-		0.2f, 0.2f, -0.2f,0.0f, 0.0f, 1.0f,
-		0.2f, -0.2f, -0.2f,0.0f, 1.0f, 1.0f,
-		0.2f, -0.2f, -0.2f,0.0f, 1.0f, 1.0f,
-		0.2f, -0.2f, 0.2f,0.0f, 1.0f, 0.0f,
-		0.2f, 0.2f, 0.2f,0.0f, 0.0f, 0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f,  0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f, -0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  1.0f,  0.0f,  0.0f,
 
-		-0.2f, -0.2f, -0.2f,1.0f, 1.0f, 1.0f,
-		0.2f, -0.2f, -0.2f,0.0f, 1.0f, 1.0f,
-		0.2f, -0.2f, 0.2f,0.0f, 1.0f, 0.0f,
-		0.2f, -0.2f, 0.2f,0.0f, 1.0f, 0.0f,
-		-0.2f, -0.2f, 0.2f,1.0f, 1.0f, 0.0f,
-		-0.2f, -0.2f, -0.2f,1.0f, 1.0f, 1.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+		 0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+		 0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+		-0.5f, -0.5f,  0.5f,  0.0f, -1.0f,  0.0f,
+		-0.5f, -0.5f, -0.5f,  0.0f, -1.0f,  0.0f,
 
-		-0.2f, 0.2f, -0.2f,1.0f, 0.0f, 1.0f,
-		0.2f, 0.2f, -0.2f,0.0f, 0.0f, 1.0f,
-		0.2f, 0.2f, 0.2f,0.0f, 0.0f, 0.0f,
-		0.2f, 0.2f, 0.2f,0.0f, 0.0f, 0.0f,
-		-0.2f, 0.2f, 0.2f,1.0f, 0.0f, 0.0f,
-		-0.2f, 0.2f, -0.2f,1.0f, 0.0f, 1.0f
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+		 0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+		-0.5f,  0.5f,  0.5f,  0.0f,  1.0f,  0.0f,
+		-0.5f,  0.5f, -0.5f,  0.0f,  1.0f,  0.0fa
 	};
+
+	unsigned int VBO, cubeVAO;
+	glGenVertexArrays(1, &cubeVAO);
+	glGenBuffers(1, &VBO);
 
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);     
+	glBindVertexArray(cubeVAO);
+
+	
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
-	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));     
+	
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3 * sizeof(float)));
 	glEnableVertexAttribArray(1);
+	
+	unsigned int lightVAO;
+	glGenVertexArrays(1, &lightVAO);
+	glBindVertexArray(lightVAO);
+
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
 
 
-	bool isTranslate = false;
 	bool isRotate = false;
 	bool isScale = false;
-	bool depthTest = false;
+	bool depthTest = true;
 	bool isSpiral = false;
+	bool isPerspective = false;
+	bool isOrthogonal = false;
+	bool isCameraSurround = false;
 
-	int r = 0;
-	int display_w, display_h;
+	float radian = 45;
+	float nearValue = 0.1;
+	float farValue = 100;
+
+	int display_w = 1024;
+	int display_h = 1024;
 	glfwMakeContextCurrent(window);
+	glfwGetFramebufferSize(window, &display_w, &display_h);
+
+	float left = -5;
+	float right = 5;
+	float bottom = -5;
+	float top = 5;
+
+	int projMode = 0;
+	int ctrlMode = 3;
+	int shaderMode = 5;
+
+	const int PERSPECTIVE = 0;
+	const int ORTHOGONAL = 1;
+	const int SELF = 2;
+	const int MOUSE = 3;
+	const int STATIC = 4;
+
+	const int PHONG = 5;
+	const int GOURAUD = 6;
+
+	float ambientStrength = 0.1;
+	int specularFactor = 32;
+	float specularStrength = 1.0;
+	// Main loop
 	while (!glfwWindowShouldClose(window))
 	{
+		float currentFrame = glfwGetTime();
+		deltaTime = currentFrame - lastFrame;
+		lastFrame = currentFrame;
+
+		processInput(window);
 		// Start the Dear ImGui frame
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplGlfw_NewFrame();
@@ -172,21 +237,49 @@ int main(int, char**)
 		// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
 		{
 			ImGui::Begin(TITLE);
+			ImGui::Text("Projection");
+			ImGui::RadioButton("Perspective projection", &projMode, PERSPECTIVE);
+			ImGui::RadioButton("Orthogonal projectio", &projMode, ORTHOGONAL);
+			
+			ImGui::Text("Shading");
+			ImGui::RadioButton("Phong Shading", &shaderMode, PHONG);
+			ImGui::RadioButton("Gouraud Shading", &shaderMode, GOURAUD);
+
+			ImGui::Checkbox("Camera surround", &isCameraSurround);
+
+			ImGui::SliderFloat("ambientStrength", &ambientStrength, 0.0, 1.0);
+			ImGui::SliderFloat("specularStrength", &specularStrength, 0.0, 1.0);
+			ImGui::SliderInt("specularFactor", &specularFactor, 1, 256);
+
+
+			ImGui::Text("Depth");
 			ImGui::Checkbox("depth test", &depthTest);
-			ImGui::Checkbox("translate", &isTranslate);
-			ImGui::Checkbox("spiral", &isSpiral);
-			ImGui::Checkbox("rotate", &isRotate);
-			ImGui::Checkbox("scale", &isScale);
+			if (projMode == PERSPECTIVE && ctrlMode == STATIC) {
+				ImGui::Text("Projection parameters");
+				ImGui::SliderFloat("radian", &radian, 1, 89);
+				ImGui::SliderFloat("near", &nearValue, -5, 5);
+				ImGui::SliderFloat("far", &farValue, 5, 150);
+				isOrthogonal = false;
+			}
+			else if (projMode == ORTHOGONAL && ctrlMode == STATIC) {
+				ImGui::Text("Projection parameters");
+				ImGui::SliderFloat("left", &left, -5, 5);
+				ImGui::SliderFloat("right", &right, -5, 5);
+				ImGui::SliderFloat("bottom", &bottom, -5, 5);
+				ImGui::SliderFloat("top", &top, -5, 5);
+				ImGui::SliderFloat("near", &nearValue, -5, 5);
+				ImGui::SliderFloat("far", &farValue, 5, 150);
+				isPerspective = false;
+			}
+
 			ImGui::End();
 		}
 
 		// Rendering
 		ImGui::Render();
 
-		glClearColor(0.2f, 0.2f, 0.2f, 1.0f);
-
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
 		if (depthTest) {
 			glEnable(GL_DEPTH_TEST);
 		}
@@ -194,34 +287,69 @@ int main(int, char**)
 			glDisable(GL_DEPTH_TEST);
 		}
 
-		glm::mat4 trans = glm::mat4(1.0f);
-		//trans = glm::translate(trans, glm::vec3(translateX, 0.0f, 0.0f));
+		if (isCameraSurround) {
+			lightPos.x = 2*sin(glfwGetTime());
+			lightPos.y = cos(glfwGetTime());
+			lightPos.z = 1;
+		}
+
+		glm::mat4 model = glm::mat4(1.0f);
+		glm::mat4 view = glm::mat4(1.0f);
+		glm::mat4 proj = glm::mat4(1.0f);
+		view = camera.GetViewMatrix();
+		radian = camera.Zoom;	
 		
-		if (isTranslate) {
-			trans = glm::translate(trans, glm::vec3(sin(glfwGetTime()), 0.0f, 0.0f));
-		} 
-		if (isSpiral) {
-			float alpha = 0.5;
-			float beta = 0.5;
-			float theta = glfwGetTime();
-			std::cout << theta << std::endl;
-			float x = 0.1 * (alpha + beta * theta) * cos(3 * theta);
-			float y = 0.1 * (alpha + beta * theta) * sin(3 * theta);
-			trans = glm::translate(trans, glm::vec3(x, y, 0.0f));
+		if (projMode == PERSPECTIVE) {
+			proj = glm::perspective(glm::radians(radian), (float)display_w / (float)display_h, nearValue, farValue);
 		}
-		if (isRotate) {
-			float radian = 100.0f * glfwGetTime();
-			trans = glm::rotate(trans, glm::radians(radian), glm::vec3(1.0, 0.0, 1.0));
+		else if (projMode == ORTHOGONAL) {
+			proj = glm::ortho(left, right, bottom, top, nearValue, farValue);
 		}
-		if (isScale) {
-			float scale = 0.5f * sin(2 * glfwGetTime()) + 1.0f;
-			trans = glm::scale(trans, glm::vec3(scale, scale, scale));
-		}
+	
+		if (shaderMode == PHONG) {
+			phongLighting.useProgram();
+			phongLighting.setModel(model);
+			phongLighting.setView(view);
+			phongLighting.setProjection(proj);
 
-		myShader.useProgram();
-		myShader.setTransform(trans);
+			phongLighting.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
+			phongLighting.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
+			phongLighting.setVec3("lightPos", lightPos.x, lightPos.y, lightPos.z);
+			phongLighting.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
+			phongLighting.setFloat("ambientStrength", ambientStrength);
+			phongLighting.setFloat("specularStrength", specularStrength);
+			phongLighting.setInteger("specularFactor", specularFactor);
+		}
+		else {
+			gouraudLighting.useProgram();
+			gouraudLighting.setModel(model);
+			gouraudLighting.setView(view);
+			gouraudLighting.setProjection(proj);
 
-		glBindVertexArray(VAO);
+			gouraudLighting.setVec3("objectColor", 1.0f, 0.5f, 0.31f);
+			gouraudLighting.setVec3("lightColor", 1.0f, 1.0f, 1.0f);
+			gouraudLighting.setVec3("lightPos", lightPos.x, lightPos.y, lightPos.z);
+			gouraudLighting.setVec3("viewPos", camera.Position.x, camera.Position.y, camera.Position.z);
+			gouraudLighting.setFloat("ambientStrength", ambientStrength);
+			gouraudLighting.setFloat("specularStrength", specularStrength);
+			gouraudLighting.setInteger("specularFactor", specularFactor);
+		}
+		
+		
+
+		glBindVertexArray(cubeVAO);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+
+		lampShader.useProgram();
+
+		model = glm::translate(model, lightPos);
+		model = glm::scale(model, glm::vec3(0.1f));
+
+		lampShader.setModel(model);
+		lampShader.setView(view);
+		lampShader.setProjection(proj);
+
+		glBindVertexArray(lightVAO);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
 
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -239,4 +367,40 @@ int main(int, char**)
 	glfwTerminate();
 
 	return 0;
+}
+
+void processInput(GLFWwindow *window)
+{
+	if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
+		glfwSetWindowShouldClose(window, true);
+
+	if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
+		camera.ProcessKeyboard(FORWARD, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
+		camera.ProcessKeyboard(BACKWARD, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
+		camera.ProcessKeyboard(LEFT, deltaTime);
+	if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
+		camera.ProcessKeyboard(RIGHT, deltaTime);
+}
+
+void mouseCallback(GLFWwindow* window, double xpos, double ypos) {
+	if (firstMouse)
+	{
+		lastX = xpos;
+		lastY = ypos;
+		firstMouse = false;
+	}
+
+	float xoffset = xpos - lastX;
+	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+	lastX = xpos;
+	lastY = ypos;
+
+	camera.ProcessMouseMovement(xoffset, yoffset);
+}
+
+void scrollCallback(GLFWwindow* window, double xoffset, double yoffset) {
+	camera.ProcessMouseScroll(yoffset);
 }
