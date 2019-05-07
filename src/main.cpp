@@ -186,7 +186,7 @@ int main(int, char**)
 	bool isSpiral = false;
 	bool isPerspective = false;
 	bool isOrthogonal = false;
-	bool isCameraSurround = false;
+	bool isLightSurround = false;
 
 	float radian = 45;
 	float nearValue = 0.1;
@@ -245,7 +245,8 @@ int main(int, char**)
 			ImGui::RadioButton("Phong Shading", &shaderMode, PHONG);
 			ImGui::RadioButton("Gouraud Shading", &shaderMode, GOURAUD);
 
-			ImGui::Checkbox("Camera surround", &isCameraSurround);
+			ImGui::Checkbox("Light surround", &isLightSurround);
+			
 
 			ImGui::SliderFloat("ambientStrength", &ambientStrength, 0.0, 1.0);
 			ImGui::SliderFloat("specularStrength", &specularStrength, 0.0, 1.0);
@@ -287,7 +288,7 @@ int main(int, char**)
 			glDisable(GL_DEPTH_TEST);
 		}
 
-		if (isCameraSurround) {
+		if (isLightSurround) {
 			lightPos.x = 2*sin(glfwGetTime());
 			lightPos.y = cos(glfwGetTime());
 			lightPos.z = 1;
