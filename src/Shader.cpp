@@ -83,11 +83,36 @@ void Shader::useProgram() {
 	glUseProgram(id);
 }
 
-void Shader::setColor(const std::string &name, float r, float g, float b, float a) const {
-	glUniform4f(glGetUniformLocation(id, name.c_str()), r, g, b, a);
+void Shader::setModel(const glm::mat4 model) const {
+	setMatrix("model", model);
 }
 
-void Shader::setTransform(const glm::mat4 trans) const {
-	unsigned int transformLoc = glGetUniformLocation(id, "transform");
-	glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
+void Shader::setView(const glm::mat4 view) const {
+	setMatrix("view", view);
 }
+
+void Shader::setProjection(const glm::mat4 projection) const {
+	setMatrix("projection", projection);
+}
+
+void Shader::setMatrix(const std::string &name, const glm::mat4 mat) const {
+	unsigned int loc = glGetUniformLocation(id, name.c_str());
+	glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(mat));
+}
+
+void Shader::setVec3(const std::string &name, float x1, float x2, float x3) const {
+	glUniform3f(glGetUniformLocation(id, name.c_str()), x1, x2, x3);
+}
+
+void Shader::setVec4(const std::string &name, float x1, float x2, float x3, float x4) const {
+	glUniform4f(glGetUniformLocation(id, name.c_str()), x1, x2, x3, x4);
+}
+
+void Shader::setFloat(const std::string &name, float value) const {
+	glUniform1f(glGetUniformLocation(id, name.c_str()), value);
+}
+
+void Shader::setInteger(const std::string &name, int value) const {
+	glUniform1i(glGetUniformLocation(id, name.c_str()), value);
+}
+
