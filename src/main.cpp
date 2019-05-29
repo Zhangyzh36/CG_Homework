@@ -53,27 +53,31 @@ void drawPoint(const std::vector<glm::vec3> &points);
 const int SCREEN_WIDTH = 1024;
 const int SCREEN_HEIGHT = 1024;
 
-Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
 float lastX = SCREEN_WIDTH / 2.0f;
 float lastY = SCREEN_WIDTH / 2.0f;
-bool firstMouse = true;
+
 
 enum STATE{PAUSE, INCREASE, DECREASE};
 STATE state = PAUSE;
 STATE lastState = PAUSE;
-// timing
-float deltaTime = 0.0f;	// time between current frame and last frame
-float lastFrame = 0.0f;
+
 int display_w = 1024;
 int display_h = 1024;
 
-glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
 
 unsigned int VAO;
 unsigned int VBO;
 Bezier bezier;
 float t = 0.25;
 
+Camera camera(glm::vec3(0.0f, 0.0f, 3.0f));
+glm::vec3 lightPos(-2.0f, 4.0f, -1.0f);
+
+// timing
+float deltaTime = 0.0f;	// time between current frame and last frame
+float lastFrame = 0.0f;
+
+bool firstMouse = true;
 int main(int, char**)
 {
 	// Setup window
@@ -131,8 +135,6 @@ int main(int, char**)
 	glGenBuffers(1, &VBO);
 	glBindVertexArray(VAO);
 	
-
-
 	// Main loop
 	while (!glfwWindowShouldClose(window))
 	{
